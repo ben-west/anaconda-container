@@ -1,71 +1,123 @@
-FROM debian:8.5
-# Forked from https://github.com/ContinuumIO/docker-images/tree/master/anaconda3
-MAINTAINER Kamil Kwiek <kamil.kwiek@continuum.io>
+FROM jupyter/scipy-notebook
 
-ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
+MAINTAINER Jupyter Project <jupyter@googlegroups.com>
 
-RUN apt-get update --fix-missing && \
-    apt-get install -y \
-    wget \
-    bzip2 \
-    ca-certificates \
-    unzip\
-    libglib2.0-0 \
-    libxext6 \
-    libsm6 \
-    libxrender1 \
+USER root
+
+# R pre-requisites
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    fonts-dejavu \
+    gfortran \
     apt-utils \
-    git \
-    build-essential \
-    gcc \
-    zsh \
-    git-all \
-    curl \
-    grep \
-    sed \
-    dpkg && \
-    rm -rf /var/lib/apt/lists/* && \
-    apt-get clean
+    libcurl4-openssl-dev \
+    zlib1g-dev \
+    libssl-dev \
+    libpcre++-dev \
+    liblzma-dev \
+    libbz2-dev \
+    libpq-dev \
+    gcc && apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-RUN TINI_VERSION=`curl https://github.com/krallin/tini/releases/latest | grep -o "/v.*\"" | sed 's:^..\(.*\).$:\1:'` && \
-    curl -L "https://github.com/krallin/tini/releases/download/v${TINI_VERSION}/tini_${TINI_VERSION}.deb" > tini.deb && \
-    dpkg -i tini.deb && \
-    rm tini.deb
+USER $NB_USER
 
-RUN echo 'export PATH=/opt/conda/bin:$PATH' > /etc/profile.d/conda.sh && \
-    curl https://repo.continuum.io/archive/Anaconda3-4.4.0-Linux-x86_64.sh > ~/anaconda.sh && \
-    /bin/bash ~/anaconda.sh -b -p /opt/conda && \
-    rm ~/anaconda.sh
+# R packages including IRKernel which gets installed globally.
+RUN conda config --system --add channels r && \
+    conda install --quiet --yes \
 
-RUN /opt/conda/bin/pip install  datacleaner mlxtend && \
-    /opt/conda/bin/conda install jupyter -y && \
-    /opt/conda/bin/conda install -c districtdatalabs yellowbrick && \
-    git clone https://github.com/hyperopt/hyperopt-sklearn.git /tmp/hpsklearn && \
-    cd /tmp/hpsklearn && \
-    /opt/conda/bin/python setup.py install && \
-    rm -rf /tmp/hpsklearn
+# Conda: R libaries
 
-RUN mkdir -p /tmp && \
-    wget -v "http://featureselection.asu.edu/download_file.php?filename=scikit-feature-1.0.0.zip&dir=files/" -O /tmp/scikit-feature-1.0.0.zip && \
-    ls -la /tmp && \
-    cd /tmp/ && \
-    unzip scikit-feature-1.0.0.zip && \
-    cd /tmp/scikit-feature-1.0.0  && \
-    /opt/conda/bin/python setup.py install && \
-    cd / && \
-    rm -rf /tmp/scikit-feature-1.0.0
+    'rpy2=2.8*' \
+    'r-base=3.3.2' \
+    'r-irkernel=0.7*' \
+    'r-plyr=1.8*' \
+    'r-devtools=1.12*' \
+    'r-tidyverse=1.0*' \
+    'r-shiny=0.14*' \
+    'r-rmarkdown=1.2*' \
+    'r-forecast=7.3*' \
+    'r-rsqlite=1.1*' \
+    'r-reshape2=1.4*' \
+    'r-nycflights13=0.2*' \
+    'r-caret=6.0*' \
+    'r-rcurl=1.95*' \
+    'r-crayon=1.3*' \
+    'r-igraph' \
+    'r-randomforest=4.6*'  \
 
+# Conda: Python libaries
 
-ENV PATH /opt/conda/bin:$PATH
+    'tensorflow' && \
+    conda clean -tipsy && \
+    fix-permissions $CONDA_DIR
 
-RUN  conda install -y nb_conda_kernels &&\
-    conda create -y -n py27 python=2.7 ipykernel &&\
-    conda create -y -n py36 python=3.6 ipykernel
+RUN R -e "install.packages(c(\
+    'Amelia', \
+    'shinydashboard', \
+    'shinyjs', \
+    'shinyWidgets', \
+    'ggthemes', \
+    'ggthemes', \
+    'ggvis', \
+    'data.table', \
+    'networkD3', \
+    'plotly', \
+    'roxygen2', \
+    'rgdal', \
+    'RPostgreSQL', \
+    'maptools', \
+    'rgeos', \
+    'spatstat', \
+    'sp', \
+    'spdep', \
+    'network', \
+    'visNetwork', \
+    'ndtv', \
+    'networkDynamic' \
+    ), repos = 'http://cran.us.r-project.org')"
 
-# Source files should live in a persistent volume rather than in volatile storage
-RUN mkdir -p /data
-VOLUME /data
+RUN  pip install \
+     'psycopg2==2.7.3'  \
+     'xgboost'  \
+     'mlxtend'  \
+     'xlsxwriter==0.9.6'  \
+     'argh==0.26.1'  \
+     'boto==2.39.0'  \
+     'bottleneck==1.0.0'  \
+     'brewer2mpl==1.4.1'  \
+     'bz2file==0.98'  \
+     'elasticsearch==1.9.0'  \
+     'future==0.16.0'  \
+     'gensim==0.12.4'  \
+     'ggplot'  \
+     'httpretty==0.8.10'  \
+     'hyperopt'  \
+     'hypothesis==2.0.0'  \
+     'igraph'  \
+     'nltk'  \
+     'nose==1.3.7'  \
+     'pathtools==0.1.2'  \
+     'pprintpp==0.2.3'  \
+     'py==1.4.31'  \
+     'py-postgresql==1.1.0'  \
+     'py2neo==2.0.8'  \
+     'pydot2==1.0.33'  \
+     'pydotplus==2.0.2'  \
+     'pymongo==3.4.0'  \
+     'pytest==3.0.1'  \
+     'smartopen'  \
+     'tika==1.15'  \
+     'virtualenv'  \
+     'watchdog==0.8.3' \
+     'folium' \
+     'keras'
 
-ENTRYPOINT [ "/usr/bin/tini", "--" ]
+RUN echo $NB_USER
 
-CMD [ "/bin/bash", "-c", "jupyter notebook --notebook-dir=/Data --ip='*' --port=8888 --no-browser --allow-root" ]
+USER root
+
+RUN conda install --quiet --yes \
+    libgdal && \
+    conda clean -tipsy && \
+    fix-permissions $CONDA_DIR

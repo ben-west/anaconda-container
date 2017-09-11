@@ -1,5 +1,6 @@
 ./.git/*
 .dockerignore
+./build-container.sh
 .gitignore
 ./Dockerfile
 ./LICENSE
